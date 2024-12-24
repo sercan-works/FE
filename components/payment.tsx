@@ -16,6 +16,8 @@ import {
   Chip,
   User,
   Pagination,
+  Selection,
+  SortDescriptor,
 } from "@nextui-org/react";
 
 export const columns = [
@@ -238,11 +240,21 @@ export const users = [
   },
 ];
 
-export function capitalize(s) {
+export function capitalize(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "";
 }
 
-export const PlusIcon = ({size = 24, width, height, ...props}) => {
+export const PlusIcon = ({
+  size = 24, 
+  width, 
+  height, 
+  ...props
+}: {
+  size?: number;
+  width?: number;
+  height?: number;
+  [key: string]: any;
+}) => {
   return (
     <svg
       aria-hidden="true"
@@ -268,7 +280,17 @@ export const PlusIcon = ({size = 24, width, height, ...props}) => {
   );
 };
 
-export const VerticalDotsIcon = ({size = 24, width, height, ...props}) => {
+export const VerticalDotsIcon = ({
+  size = 24, 
+  width, 
+  height, 
+  ...props
+}: {
+  size?: number;
+  width?: number;
+  height?: number;
+  [key: string]: any;
+}) => {
   return (
     <svg
       aria-hidden="true"
@@ -288,7 +310,7 @@ export const VerticalDotsIcon = ({size = 24, width, height, ...props}) => {
   );
 };
 
-export const SearchIcon = (props) => {
+export const SearchIcon = (props: React.JSX.IntrinsicAttributes & React.SVGProps<SVGSVGElement>) => {
   return (
     <svg
       aria-hidden="true"
@@ -342,7 +364,7 @@ export const ChevronDownIcon = ({strokeWidth = 1.5, ...otherProps}) => {
   );
 };
 
-const statusColorMap = {
+const statusColorMap: Record<string, "success" | "danger" | "warning"> = {
   active: "success",
   paused: "danger",
   vacation: "warning",
@@ -352,22 +374,22 @@ const INITIAL_VISIBLE_COLUMNS = ["name", "role", "status", "actions"];
 
 export default function Payment() {
   const [filterValue, setFilterValue] = React.useState("");
-  const [selectedKeys, setSelectedKeys] = React.useState(new Set([]));
-  const [visibleColumns, setVisibleColumns] = React.useState(new Set(INITIAL_VISIBLE_COLUMNS));
-  const [statusFilter, setStatusFilter] = React.useState("all");
+  const [selectedKeys, setSelectedKeys] = React.useState<Selection>(new Set());
+  const [visibleColumns, setVisibleColumns] = React.useState<Selection>(new Set(INITIAL_VISIBLE_COLUMNS));
+  const [statusFilter, setStatusFilter] = React.useState<Selection>("all");
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
-  const [sortDescriptor, setSortDescriptor] = React.useState({
+  const [sortDescriptor, setSortDescriptor] = React.useState<SortDescriptor>({
     column: "age",
-    direction: "ascending",
+    direction: "ascending" as "ascending" | "descending",
   });
   const [page, setPage] = React.useState(1);
 
   const hasSearchFilter = Boolean(filterValue);
 
   const headerColumns = React.useMemo(() => {
-    if (visibleColumns === "all") return columns;
+    if (visibleColumns === "all" || !(visibleColumns instanceof Set)) return columns;
 
-    return columns.filter((column) => Array.from(visibleColumns).includes(column.uid));
+    return columns.filter((column) => visibleColumns.has(column.uid));
   }, [visibleColumns]);
 
   const filteredItems = React.useMemo(() => {
@@ -385,7 +407,7 @@ export default function Payment() {
     }
 
     return filteredUsers;
-  }, [users, filterValue, statusFilter]);
+  }, [hasSearchFilter, statusFilter, filterValue]);
 
   const pages = Math.ceil(filteredItems.length / rowsPerPage);
 
@@ -398,15 +420,16 @@ export default function Payment() {
 
   const sortedItems = React.useMemo(() => {
     return [...items].sort((a, b) => {
-      const first = a[sortDescriptor.column];
-      const second = b[sortDescriptor.column];
+      const column = sortDescriptor.column as keyof typeof a;
+      const first = a[column];
+      const second = b[column];
       const cmp = first < second ? -1 : first > second ? 1 : 0;
 
       return sortDescriptor.direction === "descending" ? -cmp : cmp;
     });
   }, [sortDescriptor, items]);
 
-  const renderCell = React.useCallback((user, columnKey) => {
+  const renderCell = React.useCallback((user: { [x: string]: any; avatar: any; email: string | number | bigint | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | Promise<React.AwaitedReactNode> | null | undefined; team: string | number | bigint | boolean | React.ReactElement<any, string | React.JSXElementConstructor<any>> | Iterable<React.ReactNode> | React.ReactPortal | Promise<React.AwaitedReactNode> | null | undefined; status: string | number; }, columnKey: string | number) => {
     const cellValue = user[columnKey];
 
     switch (columnKey) {
@@ -429,7 +452,12 @@ export default function Payment() {
         );
       case "status":
         return (
-          <Chip className="capitalize" color={statusColorMap[user.status]} size="sm" variant="flat">
+          <Chip 
+            className="capitalize" 
+            color={statusColorMap[(user.status as string).toLowerCase() as keyof typeof statusColorMap]} 
+            size="sm" 
+            variant="flat"
+          >
             {cellValue}
           </Chip>
         );
@@ -467,12 +495,12 @@ export default function Payment() {
     }
   }, [page]);
 
-  const onRowsPerPageChange = React.useCallback((e) => {
+  const onRowsPerPageChange = React.useCallback((e: { target: { value: any; }; }) => {
     setRowsPerPage(Number(e.target.value));
     setPage(1);
   }, []);
 
-  const onSearchChange = React.useCallback((value) => {
+  const onSearchChange = React.useCallback((value: React.SetStateAction<string>) => {
     if (value) {
       setFilterValue(value);
       setPage(1);
@@ -563,15 +591,7 @@ export default function Payment() {
         </div>
       </div>
     );
-  }, [
-    filterValue,
-    statusFilter,
-    visibleColumns,
-    onRowsPerPageChange,
-    users.length,
-    onSearchChange,
-    hasSearchFilter,
-  ]);
+  }, [filterValue, onSearchChange, statusFilter, visibleColumns, onRowsPerPageChange, onClear]);
 
   const bottomContent = React.useMemo(() => {
     return (
@@ -600,7 +620,7 @@ export default function Payment() {
         </div>
       </div>
     );
-  }, [selectedKeys, items.length, page, pages, hasSearchFilter]);
+  }, [selectedKeys, filteredItems.length, page, pages, onPreviousPage, onNextPage]);
 
   return (
     <Table

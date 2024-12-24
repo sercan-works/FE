@@ -16,7 +16,10 @@ import {
   Chip,
   User,
   Pagination,
+  Selection,
+  SortDescriptor,
 } from "@nextui-org/react";
+import type { Key } from '@react-types/shared';
 
 export const columns = [
   {name: "ID", uid: "id", sortable: true},
@@ -238,11 +241,21 @@ export const users = [
   },
 ];
 
-export function capitalize(s) {
+export function capitalize(s: string): string {
   return s ? s.charAt(0).toUpperCase() + s.slice(1).toLowerCase() : "";
 }
 
-export const PlusIcon = ({size = 24, width, height, ...props}) => {
+export const PlusIcon = ({
+  size = 24, 
+  width, 
+  height, 
+  ...props
+}: {
+  size?: number;
+  width?: number;
+  height?: number;
+  [key: string]: any;
+}) => {
   return (
     <svg
       aria-hidden="true"
@@ -268,7 +281,17 @@ export const PlusIcon = ({size = 24, width, height, ...props}) => {
   );
 };
 
-export const VerticalDotsIcon = ({size = 24, width, height, ...props}) => {
+export const VerticalDotsIcon = ({
+  size = 24, 
+  width, 
+  height, 
+  ...props
+}: {
+  size?: number;
+  width?: number;
+  height?: number;
+  [key: string]: any;
+}) => {
   return (
     <svg
       aria-hidden="true"
@@ -288,7 +311,7 @@ export const VerticalDotsIcon = ({size = 24, width, height, ...props}) => {
   );
 };
 
-export const SearchIcon = (props) => {
+export const SearchIcon = (props: React.JSX.IntrinsicAttributes & React.SVGProps<SVGSVGElement>) => {
   return (
     <svg
       aria-hidden="true"
@@ -342,32 +365,32 @@ export const ChevronDownIcon = ({strokeWidth = 1.5, ...otherProps}) => {
   );
 };
 
-const statusColorMap = {
+const statusColorMap: Record<string, "success" | "danger" | "warning" | "default" | "primary" | "secondary"> = {
   active: "success",
   paused: "danger",
   vacation: "warning",
 };
 
-const INITIAL_VISIBLE_COLUMNS = ["name", "role", "status", "actions"];
+const INITIAL_VISIBLE_COLUMNS = ["name", "role", "status", "actions"] as Key[];
 
 export default function Appointments() {
   const [filterValue, setFilterValue] = React.useState("");
-  const [selectedKeys, setSelectedKeys] = React.useState(new Set([]));
-  const [visibleColumns, setVisibleColumns] = React.useState(new Set(INITIAL_VISIBLE_COLUMNS));
-  const [statusFilter, setStatusFilter] = React.useState("all");
+  const [selectedKeys, setSelectedKeys] = React.useState<Selection>(new Set());
+  const [visibleColumns, setVisibleColumns] = React.useState<Selection>(new Set(INITIAL_VISIBLE_COLUMNS));
+  const [statusFilter, setStatusFilter] = React.useState<Selection>("all");
   const [rowsPerPage, setRowsPerPage] = React.useState(5);
-  const [sortDescriptor, setSortDescriptor] = React.useState({
+  const [sortDescriptor, setSortDescriptor] = React.useState<SortDescriptor>({
     column: "age",
-    direction: "ascending",
+    direction: "ascending" as "ascending" | "descending",
   });
   const [page, setPage] = React.useState(1);
 
   const hasSearchFilter = Boolean(filterValue);
 
   const headerColumns = React.useMemo(() => {
-    if (visibleColumns === "all") return columns;
+    if (visibleColumns === "all" || !(visibleColumns instanceof Set)) return columns;
 
-    return columns.filter((column) => Array.from(visibleColumns).includes(column.uid));
+    return columns.filter((column) => visibleColumns.has(column.uid));
   }, [visibleColumns]);
 
   const filteredItems = React.useMemo(() => {
@@ -378,14 +401,14 @@ export default function Appointments() {
         user.name.toLowerCase().includes(filterValue.toLowerCase()),
       );
     }
-    if (statusFilter !== "all" && Array.from(statusFilter).length !== statusOptions.length) {
+    if (statusFilter !== "all" && statusFilter instanceof Set && statusFilter.size !== statusOptions.length) {
       filteredUsers = filteredUsers.filter((user) =>
-        Array.from(statusFilter).includes(user.status),
+        statusFilter.has(user.status.toLowerCase())
       );
     }
 
     return filteredUsers;
-  }, [users, filterValue, statusFilter]);
+  }, [filterValue, statusFilter, hasSearchFilter]);
 
   const pages = Math.ceil(filteredItems.length / rowsPerPage);
 
@@ -398,16 +421,26 @@ export default function Appointments() {
 
   const sortedItems = React.useMemo(() => {
     return [...items].sort((a, b) => {
-      const first = a[sortDescriptor.column];
-      const second = b[sortDescriptor.column];
+      const column = sortDescriptor.column as keyof typeof a;
+      const first = a[column];
+      const second = b[column];
       const cmp = first < second ? -1 : first > second ? 1 : 0;
 
       return sortDescriptor.direction === "descending" ? -cmp : cmp;
     });
   }, [sortDescriptor, items]);
 
-  const renderCell = React.useCallback((user, columnKey) => {
-    const cellValue = user[columnKey];
+  const renderCell = React.useCallback((user: {
+    id: number;
+    name: string;
+    role: string;
+    team: string;
+    status: string;
+    age: string;
+    avatar: string;
+    email: string;
+  }, columnKey: Key) => {
+    const cellValue = user[columnKey as keyof typeof user];
 
     switch (columnKey) {
       case "name":
@@ -429,7 +462,12 @@ export default function Appointments() {
         );
       case "status":
         return (
-          <Chip className="capitalize" color={statusColorMap[user.status]} size="sm" variant="flat">
+          <Chip 
+            className="capitalize" 
+            color={statusColorMap[user.status.toLowerCase() as keyof typeof statusColorMap]} 
+            size="sm" 
+            variant="flat"
+          >
             {cellValue}
           </Chip>
         );
@@ -467,12 +505,12 @@ export default function Appointments() {
     }
   }, [page]);
 
-  const onRowsPerPageChange = React.useCallback((e) => {
+  const onRowsPerPageChange = React.useCallback((e: { target: { value: any; }; }) => {
     setRowsPerPage(Number(e.target.value));
     setPage(1);
   }, []);
 
-  const onSearchChange = React.useCallback((value) => {
+  const onSearchChange = React.useCallback((value: React.SetStateAction<string>) => {
     if (value) {
       setFilterValue(value);
       setPage(1);
@@ -512,7 +550,7 @@ export default function Appointments() {
                 closeOnSelect={false}
                 selectedKeys={statusFilter}
                 selectionMode="multiple"
-                onSelectionChange={setStatusFilter}
+                onSelectionChange={(keys: Selection) => setStatusFilter(keys)}
               >
                 {statusOptions.map((status) => (
                   <DropdownItem key={status.uid} className="capitalize">
@@ -533,7 +571,7 @@ export default function Appointments() {
                 closeOnSelect={false}
                 selectedKeys={visibleColumns}
                 selectionMode="multiple"
-                onSelectionChange={setVisibleColumns}
+                onSelectionChange={(keys: Selection) => setVisibleColumns(keys)}
               >
                 {columns.map((column) => (
                   <DropdownItem key={column.uid} className="capitalize">
@@ -563,23 +601,15 @@ export default function Appointments() {
         </div>
       </div>
     );
-  }, [
-    filterValue,
-    statusFilter,
-    visibleColumns,
-    onRowsPerPageChange,
-    users.length,
-    onSearchChange,
-    hasSearchFilter,
-  ]);
+  }, [filterValue, onSearchChange, statusFilter, visibleColumns, onRowsPerPageChange, onClear]);
 
   const bottomContent = React.useMemo(() => {
     return (
       <div className="py-2 px-2 flex justify-between items-center">
         <span className="w-[30%] text-small text-default-400">
-          {selectedKeys === "all"
-            ? "All items selected"
-            : `${selectedKeys.size} of ${filteredItems.length} selected`}
+          {selectedKeys instanceof Set
+            ? `${selectedKeys.size} of ${filteredItems.length} selected`
+            : "All items selected"}
         </span>
         <Pagination
           isCompact
@@ -600,7 +630,7 @@ export default function Appointments() {
         </div>
       </div>
     );
-  }, [selectedKeys, items.length, page, pages, hasSearchFilter]);
+  }, [selectedKeys, filteredItems.length, page, pages, onPreviousPage, onNextPage]);
 
   return (
     <Table
